@@ -17,7 +17,7 @@
 
 ## 📖 What is this?
 
-You run a script that promises **"free Robux,"** *or **"auto-farm"** — and inside sits malware.
+You run a script that promises **"free Robux,"** **or** **"auto-farm"** — and inside sits malware.
 
 It reads your `.ROBLOSECURITY` token, sends requests to third-party servers, calls `PerformPurchaseV2` and `PromptRobloxPurchase`, steals items through trade Remotes, takes screenshots of your screen and sends them to the "author."
 
