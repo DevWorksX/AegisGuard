@@ -258,17 +258,6 @@ ORIG.task_spawn(function()
     end
 end)
 
-ORIG.task_spawn(function()
-    while ORIG.task_wait(5) do
-        if ORIG.debug_getinfo then
-            local ok, info = pcall(ORIG.debug_getinfo, ORIG.getgenv().loadstring, "S")
-            if ok and info and info.what ~= "C" and ORIG.newcclosure then
-                notifier("Anti-Tamper: loadstring re-hooked as Lua function", 0.05, 5)
-            end
-        end
-    end
-end)
-
 local function wrapRequest(originalFn, t)
     if type(t) ~= "table" or type(t.Url) ~= "string" then
         return originalFn(t)
