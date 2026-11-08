@@ -239,26 +239,6 @@ for _, name in ipairs(DANGEROUS_INTROSPECTION) do
     end
 end
 
-local getgenvCallCount = 0
-do
-    local realGetgenv = ORIG.getgenv
-    ORIG.getgenv = function()
-        getgenvCallCount = getgenvCallCount + 1
-        local env = realGetgenv()
-        if getgenvCallCount % 20 == 0 then
-            for k, v in pairs(env) do
-                if type(v) == "function" and type(k) == "string" then
-                    local lower = k:lower()
-                    if lower:find("hook", 1, true) or lower:find("bypass", 1, true) or lower:find("exploit", 1, true) then
-                        notifier("Suspicious getgenv injection: " .. tostring(k), 0.05, 3)
-                    end
-                end
-            end
-        end
-        return env
-    end
-end
-
 if ORIG.newcclosure then
     local wrappedNotifier = ORIG.newcclosure(function(...) return notifier(...) end)
     ORIG.getgenv()[NOTIFY_KEY] = wrappedNotifier
