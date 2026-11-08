@@ -4,7 +4,7 @@
 
 ### Account & Inventory Protector for Roblox
 
-**Stops malicious "cheats" from touching your inventory, Robux, tokens, and privacy.**
+**Stops malicious scripts from touching your inventory, Robux, tokens, and privacy.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Roblox](https://img.shields.io/badge/Roblox-Client-red)](https://www.roblox.com)
@@ -17,7 +17,7 @@
 
 ## 📖 What is this?
 
-You run a script that promises **"free Robux,"** **"noclip cheat,"** or **"auto-farm"** — and inside sits malware.
+You run a script that promises **"free Robux,"** **"any strange universal script,"** or **"auto-farm"** — and inside sits malware.
 
 It reads your `.ROBLOSECURITY` token, sends requests to third-party servers, calls `PerformPurchaseV2` and `PromptRobloxPurchase`, steals items through trade Remotes, takes screenshots of your screen and sends them to the "author."
 
