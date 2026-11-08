@@ -1,15 +1,11 @@
 --[[
     AegisGuard v3 — Account & Inventory Protector
     Runtime patcher for the Roblox client.
+    
     Blocks malicious scripts disguised as "cheats" from touching your
     inventory, Robux, tokens, files, and privacy.
-
+    
     Run BEFORE any third-party scripts. Recommended: autoexec.
-
-    WARNING: Client-side protection is never absolute.
-    The only real protection is server-side validation.
-    If a script asks you to disable AegisGuard — don't run it.
-
     License: MIT
 ]]
 
@@ -31,44 +27,10 @@ local ORIG = {
     task_delay      = task.delay,
 }
 
-local function randomKey(len, lo, hi)
-    local out = {}
-    for _ = 1, len do
-        out[#out + 1] = string.char(math.random(lo, hi))
-    end
-    return table.concat(out):gsub("'", "")
+-- // Тихая функция логирования. Выводит только в консоль разработчика (F9)
+local function log_block(reason)
+    warn("[AegisGuard] Blocked: " .. tostring(reason))
 end
-
-local NOTIFY_KEY = randomKey(math.random(16, 128), 65, 122)
-local IS_VULN_CHECKER_LOADED = false
-
-local function notifier(str, ts, wt)
-    if IS_VULN_CHECKER_LOADED then return end
-    local ok, err = pcall(function()
-        local msg = Instance.new("Message")
-        msg.Name = randomKey(math.random(16, 128), 65, 122)
-        msg.Parent = game:GetService("CoreGui")
-        local chars = string.split(str, "")
-        for i = 1, #chars do
-            msg.Text = msg.Text .. chars[i]
-            ORIG.task_wait(ts)
-        end
-        ORIG.task_wait(wt)
-        local urlChars = string.split("https://t.me/arceusxscripts/5612", "")
-        msg.Text = ""
-        for i = 1, #urlChars do
-            msg.Text = msg.Text .. urlChars[i]
-            ORIG.task_wait(ts)
-        end
-        ORIG.task_wait(wt)
-        msg:Destroy()
-    end)
-    if not ok then
-        warn("[AegisGuard] notifier failed: " .. tostring(err))
-    end
-end
-
-ORIG.getgenv()[NOTIFY_KEY] = notifier
 
 local MALICIOUS_URLS = {
     "https://raw.githubusercontent.com/sekrte3345544/Roblox/main/new-obfuscated.lua",
@@ -103,22 +65,16 @@ end
 local loadstringCount = 0
 local function safeLoadstring(code, chunkname)
     if isMaliciousBody(code) then
-        return function()
-            notifier("Prevented a malicious script to load", 0.05, 2.5)
-        end
-    end
-    if type(code) == "string" and code:find("arceusxscripts", 1, true) then
-        IS_VULN_CHECKER_LOADED = true
-        ORIG.task_spawn(function()
-            ORIG.task_wait(30)
-            IS_VULN_CHECKER_LOADED = false
-        end)
-    end
-    loadstringCount = loadstringCount + 1
-    if loadstringCount > 8 then
-        notifier("Rate limit: too many loadstring calls", 0.05, 5)
+        log_block("malicious script to load")
         return function() end
     end
+    
+    loadstringCount = loadstringCount + 1
+    if loadstringCount > 8 then
+        log_block("Rate limit: too many loadstring calls")
+        return function() end
+    end
+    
     ORIG.task_delay(1, function()
         loadstringCount = math.max(0, loadstringCount - 1)
     end)
@@ -138,7 +94,7 @@ for name, returnValue in pairs(FILE_IO_BLACKLIST) do
         local captured = name
         local ret = returnValue
         ORIG.getgenv()[name] = function(...)
-            notifier("Prevented a malicious file I/O operation: " .. captured, 0.05, 2.5)
+            log_block("file I/O operation: " .. captured)
             return ret
         end
     end
@@ -150,7 +106,7 @@ local omni     = game:GetService("OmniRecommendationsService")
 local oldIndex
 oldIndex = ORIG.hookmetamethod(game, "__index", ORIG.newcclosure(function(self, key)
     if key == "MessageBusService" and self == game then
-        notifier("Prevented access to MessageBusService", 0.05, 2.5)
+        log_block("access to MessageBusService")
         return nil
     end
     return oldIndex(self, key)
@@ -161,17 +117,17 @@ oldNamecall = ORIG.hookmetamethod(game, "__namecall", ORIG.newcclosure(function(
     if ORIG.checkcaller() then
         local method = ORIG.getnamecall()
         local args = { ... }
-        local errstr = "Blocked " .. tostring(method) .. " that was created by your exploit // by https://t.me/arceusxscripts"
+        local errstr = "[AegisGuard] Blocked " .. tostring(method)
 
         if self == game and method == "GetService" and args[1] == "MessageBusService" then
-            notifier("Prevented access to MessageBusService", 0.05, 2.5)
+            log_block("access to MessageBusService")
             error(errstr)
         end
 
         if typeof(self) == "Instance" and self.ClassName == "MessageBusService" then
             local allowed = { GetFullName = true, ClassName = true }
             if not allowed[method] then
-                notifier("Blocked MessageBusService method: " .. tostring(method), 0.05, 2.5)
+                log_block("MessageBusService method: " .. tostring(method))
                 error(errstr)
             end
         end
@@ -186,43 +142,26 @@ oldNamecall = ORIG.hookmetamethod(game, "__namecall", ORIG.newcclosure(function(
             HttpRequestAsync = true, ReportAbuseV3 = true,
         }
         if BLOCKED[method] then
-            warn(errstr)
-            notifier("Prevented a malicious function to execute", 0.05, 2.5)
+            log_block("malicious function: " .. tostring(method))
             return nil
         end
 
         if (method == "GetAsync" and self == rbxapis) or (method == "MakeRequest" and self == omni) then
-            warn(errstr)
-            notifier("Prevented a malicious function to execute", 0.05, 2.5)
+            log_block("malicious function: " .. tostring(method))
             return nil
         end
 
         if method == "TakeScreenshot" or method == "ToggleRecording" or method == "GetRobuxBalance" then
-            notifier("Prevented a malicious function to execute", 0.05, 2.5)
+            log_block("malicious function: " .. tostring(method))
             error(errstr)
         end
         if self == game and method == "Load" then
-            notifier("Prevented game:Load", 0.05, 2.5)
+            log_block("game:Load")
             error(errstr)
         end
     end
     return oldNamecall(self, ...)
 end))
-
-ORIG.task_spawn(function()
-    while ORIG.task_wait(2) do
-        local ok = pcall(function() return ORIG.getfenv(9999) end)
-        if ok then
-            notifier("Anti-Tamper: getfenv hook detected", 0.05, 5)
-        end
-        if ORIG.debug_getinfo then
-            local okInfo, info = pcall(ORIG.debug_getinfo, ORIG.getfenv, "S")
-            if okInfo and info and info.what ~= "C" then
-                notifier("Anti-Tamper: getfenv not native", 0.05, 5)
-            end
-        end
-    end
-end)
 
 local DANGEROUS_INTROSPECTION = {
     "getgc", "getreg", "getupvalue", "setupvalue",
@@ -233,30 +172,16 @@ for _, name in ipairs(DANGEROUS_INTROSPECTION) do
     if ORIG.getgenv()[name] then
         local captured = name
         ORIG.getgenv()[name] = function()
-            notifier("Blocked dangerous introspection: " .. captured, 0.05, 3)
+            log_block("dangerous introspection: " .. captured)
             return nil
         end
     end
 end
 
 if ORIG.newcclosure then
-    local wrappedNotifier = ORIG.newcclosure(function(...) return notifier(...) end)
-    ORIG.getgenv()[NOTIFY_KEY] = wrappedNotifier
-
     local wrappedLS = ORIG.newcclosure(function(...) return safeLoadstring(...) end)
     ORIG.getgenv().loadstring = wrappedLS
 end
-
-ORIG.task_spawn(function()
-    while ORIG.task_wait(1) do
-        if type(ORIG.getgenv().loadstring) ~= "function" then
-            warn("[AegisGuard] ANTI-TAMPER: loadstring destroyed!")
-        end
-        if type(ORIG.getgenv()[NOTIFY_KEY]) ~= "function" then
-            warn("[AegisGuard] ANTI-TAMPER: notifier global missing!")
-        end
-    end
-end)
 
 local function wrapRequest(originalFn, t)
     if type(t) ~= "table" or type(t.Url) ~= "string" then
@@ -271,8 +196,7 @@ local function wrapRequest(originalFn, t)
     if isMaliciousUrl(t.Url) then
         return {
             Success = true, StatusCode = 200, StatusMessage = "OK",
-            Headers = {}, Cookies = {},
-            Body = "getgenv()['" .. NOTIFY_KEY .. "']('Prevented a trolling script to load',0.05,2.5)",
+            Headers = {}, Cookies = {}, Body = '{"status":"OK"}',
         }
     end
     return originalFn(t)
@@ -290,5 +214,3 @@ end
 if ORIG.fluxus_request then
     ORIG.getgenv().fluxus.request = function(t) return wrapRequest(ORIG.fluxus_request, t) end
 end
-
-notifier("AegisGuard v3 active", 0.05, 2.5)
